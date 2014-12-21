@@ -78,10 +78,16 @@ component extends="mxunit.framework.TestCase" {
 		// substringOf
 
 		// and
-		//FAILS: result = OData.parseFilter("firstName eq 'john' and lastName eq 'doe'");
+		result = OData.parseFilter("firstName eq 'john' and lastName eq 'doe'");
+		assertEquals("firstName=:firstName and lastName=:lastName", result.sql);
+		assertEquals("john", result.parameters["firstName"]);
+		assertEquals("doe", result.parameters["lastName"]);
 
 		// or
-		//FAILS: result = OData.parseFilter("firstName eq 'john' or firstName eq 'jane'");
+		result = OData.parseFilter("firstName eq 'john' or firstName eq 'jane'");
+		assertEquals("firstName=:firstName or lastName=:lastName", result.sql);
+		assertEquals("john", result.parameters["firstName"]);
+		assertEquals("doe", result.parameters["lastName"]);
 
 		// NOTE: need to test paranthesis, not, arithmetic operators, and other methods not noted above
 

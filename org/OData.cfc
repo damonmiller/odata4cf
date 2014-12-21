@@ -25,87 +25,82 @@
 */
 component {
 
+	variables.operatorsMap = {
+		"EqExpression": "=",
+		"NeExpression": "!=",
+		"GtExpression": ">",
+		"GeExpression": ">=",
+		"LtExpression": "<",
+		"LeExpression": "<=",
+		"AndExpression": "and",
+		"OrExpression": "or",
+		"NotExpression": "not"
+	};
+
 	public struct function parseFilter(required string filter) {
-		// the filter string must have a length for OData
+		// empty string do not parse by OData
 		if (len(trim(arguments.filter))) {
-
-			var result = createObject("java", "java.lang.StringBuilder").init();
-			var params = {};
-
-			var parsedFilter = createObject("java", "org.odata4j.producer.resources.OptionsQueryParser").parseFilter(javaCast("string", arguments.filter));
-			var filterType = parsedFilter.toString();
-
-			if (listFind("EqExpression,NeExpression,GtExpression,GeExpression,LtExpression,LeExpression", filterType)) {
-				if (parsedFilter.getLHS().toString() == "EntitySimpleProperty") {
-					var columnName = parsedFilter.getLHS().getPropertyName();
-					result.append(columnName & getOperators()[filterType] & ":" & columnName);
-					params[columnName] = parsedFilter.getRHS().getValue();
-				}
-				else {
-					unhandledExpression("Could not convert expression to SQL.", "Type '" & parsedFilter.getLHS().toString() & "' unaccounted for.");
-				}
-			}
-			else if (listFind("StartsWithMethodCallExpression,EndsWithMethodCallExpression,SubstringOfMethodCallExpression", filterType)) {
-				var columnName = parsedFilter.getTarget().getPropertyName();
-				result.append(columnName & " like :" & columnName);
-				if (filterType == "StartsWithMethodCallExpression") {
-					// startswith converts to 'LIKE value%'
-					params[columnName] = parsedFilter.getValue().getValue() & "%";
-				}
-				else if (filterType == "EndsWithMethodCallExpression") {
-					// endswith converts to 'LIKE %value'
-					params[columnName] = "%" & parsedFilter.getValue().getValue();
-				}
-				else if (filterType == "SubstringOfMethodCallExpression") {
-					// substringof converts to 'LIKE %value%'
-					params[columnName] = "%" & parsedFilter.getValue().getValue() & "%";
-				}
-			}
-			else if (listFind("AndExpression,OrExpression", filterType)) {
-				// recursively call method passing LHS object
-				var lResult = parseFilter(parsedFilter.getLHS());
-				// add returned SQL to our SQL
-				result.append(lResult.result);
-				// merge parameters together
-				params.putAll(lResult.parameters);
-
-				// recursively call method passing RHS object
-				var rResult = parseFilter(parsedFilter.getRHS());
-				// add returned SQL to our SQL with proper operator
-				result.append(" " & getOperators()[filterType] & " " & rResult.result);
-				// merge parameters together
-				params.putAll(rResult.parameters);
-			}
-			else {
-				unhandledExpression("Could not convert expression to SQL.", "Type '" & filterType & "' unaccounted for.");
-			}
-
-			if (structCount(params)) {
-				return {
-					"sql": result.toString(),
-					"parameters": params
-				};
-			}
+			return parseODataFilter(createObject("java", "org.odata4j.producer.resources.OptionsQueryParser").parseFilter(javaCast("string", arguments.filter)));
 		}
-
-		// however we get to this case ensure we send back correct structure
 		return {
 			"sql": "",
 			"parameters": {}
 		};
 	}
 
-	private struct function getOperators() {
+	private function parseODataFilter(required filter) {
+		var result = createObject("java", "java.lang.StringBuilder").init();
+		var params = {};
+		var filterType = arguments.filter.toString();
+
+		if (listFind("EqExpression,NeExpression,GtExpression,GeExpression,LtExpression,LeExpression", filterType)) {
+			if (arguments.filter.getLHS().toString() == "EntitySimpleProperty") {
+				var columnName = arguments.filter.getLHS().getPropertyName();
+				result.append(columnName & variables.operatorsMap[filterType] & ":" & columnName);
+				params[columnName] = arguments.filter.getRHS().getValue();
+			}
+			else {
+				unhandledExpression("Could not convert expression to SQL.", "Type '" & arguments.filter.getLHS().toString() & "' unaccounted for.");
+			}
+		}
+		else if (listFind("StartsWithMethodCallExpression,EndsWithMethodCallExpression,SubstringOfMethodCallExpression", filterType)) {
+			var columnName = arguments.filter.getTarget().getPropertyName();
+			result.append(columnName & " like :" & columnName);
+			if (filterType == "StartsWithMethodCallExpression") {
+				// startswith converts to 'LIKE value%'
+				params[columnName] = arguments.filter.getValue().getValue() & "%";
+			}
+			else if (filterType == "EndsWithMethodCallExpression") {
+				// endswith converts to 'LIKE %value'
+				params[columnName] = "%" & arguments.filter.getValue().getValue();
+			}
+			else if (filterType == "SubstringOfMethodCallExpression") {
+				// substringof converts to 'LIKE %value%'
+				params[columnName] = "%" & arguments.filter.getValue().getValue() & "%";
+			}
+		}
+		else if (listFind("AndExpression,OrExpression", filterType)) {
+			// recursively call method passing LHS object
+			var lResult = parseODataFilter(arguments.filter.getLHS());
+			// add returned SQL to our SQL
+			result.append(lResult.sql);
+			// merge parameters together
+			params.putAll(lResult.parameters);
+
+			// recursively call method passing RHS object
+			var rResult = parseODataFilter(arguments.filter.getRHS());
+			// add returned SQL to our SQL with proper operator
+			result.append(" " & variables.operatorsMap[filterType] & " " & rResult.sql);
+			// merge parameters together
+			params.putAll(rResult.parameters);
+		}
+		else {
+			unhandledExpression("Could not convert expression to SQL.", "Type '" & filterType & "' unaccounted for.");
+		}
+
 		return {
-			"EqExpression": "=",
-			"NeExpression": "!=",
-			"GtExpression": ">",
-			"GeExpression": ">=",
-			"LtExpression": "<",
-			"LeExpression": "<=",
-			"AndExpression": "and",
-			"OrExpression": "or",
-			"NotExpression": "not"
+			"sql": result.toString(),
+			"parameters": params
 		};
 	}
 
