@@ -31,7 +31,7 @@ component extends="odata4cf.demo.framework.one" {
 	this.sessionManagement = true;
 	this.sessionTimeout = createTimeSpan(0, 0, 20, 0);
 
-	// OData4CF is under a sub-folder due to the structure of the project - add a mapping to find esapi4cf
+	// OData4CF is under a sub-folder due to the structure of the project - add a mapping to find it
 	this.mappings["/org"] = expandPath("/odata4cf/org");
 
 	// FW/1 settings
