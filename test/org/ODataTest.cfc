@@ -89,6 +89,11 @@ component extends="mxunit.framework.TestCase" {
 		var result = OData.parseFilter("column_a eq 'value_a' and column_b ne 'value_b' and column_c eq 'value_c'", ["column_d"]);
 		assertEquals(0, structCount(result.parameters));
 		assertEquals("", result.sql);
+
+		var result = OData.parseFilter("a eq 'b' and b eq 'c' and d eq 'e' and c eq 'd'", ["a","b","c"]);
+		$assert.isEqual(3, structCount(result.parameters));
+		$assert.isFalse(structKeyExists(result.parameters, "d3"));
+		$assert.isEqual("a=:a1 and b=:b2 and c=:c4", result.sql);
 	}
 
 	public void function testParseFilter_eq() {

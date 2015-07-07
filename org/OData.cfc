@@ -70,7 +70,6 @@ component {
 					if (structKeyExists(result, "allowed") && result.allowed) {
 						// if we hit and/or as first SQL to include, we need to skip it
 						if (!hasSQL && result.method == "handleAndOrOperators") {
-							result.allowed = false;
 							continue;
 						}
 						sb.append(" " & result["sql"]);
