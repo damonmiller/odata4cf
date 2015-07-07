@@ -58,7 +58,7 @@ component extends="mxunit.framework.TestCase" {
 		assertTrue(isSimpleValue(result.operator));
 		assertEquals("=", result.operator);
 
-		// verify parameters structure
+		// verify parameters
 		assertTrue(structKeyExists(result, "parameters"));
 		assertTrue(isStruct(result.parameters));
 		assertTrue(structKeyExists(result.parameters, "column1"));
@@ -69,7 +69,26 @@ component extends="mxunit.framework.TestCase" {
 		assertTrue(structKeyExists(result, "sql"));
 		assertTrue(isSimpleValue(result.sql));
 		assertEquals("column=:column1", result.sql);
+	}
 
+	public void function testParseFilter_allowed() {
+		var OData = new org.OData();
+
+		// verify optional 'allowed' argument
+		var result = OData.parseFilter("column_a eq 'value_a' and column_b ne 'value_b' and column_c eq 'value_c'", ["column_b"]);
+
+		// verify parameters
+		assertEquals(1, structCount(result.parameters));
+		assertTrue(structKeyExists(result.parameters, "column_b2"));
+		assertTrue(isSimpleValue(result.parameters["column_b2"]));
+		assertEquals("value_b", result.parameters["column_b2"]);
+
+		// verify sql
+		assertEquals("column_b!=:column_b2", result.sql);
+
+		var result = OData.parseFilter("column_a eq 'value_a' and column_b ne 'value_b' and column_c eq 'value_c'", ["column_d"]);
+		assertEquals(0, structCount(result.parameters));
+		assertEquals("", result.sql);
 	}
 
 	public void function testParseFilter_eq() {

@@ -65,9 +65,16 @@ component {
 			var results = method(arguments.filter, arguments.allowed);
 			var sb = createObject("java", "java.lang.StringBuilder").init();
 			if (structKeyExists(results, "parsed")) {
-				arrayEach(results.parsed, function(result) {
+				hasSQL = false;
+				arrayEach(results.parsed, function(result, i) {
 					if (structKeyExists(result, "allowed") && result.allowed) {
+						// if we hit and/or as first SQL to include, we need to skip it
+						if (!hasSQL && result.method == "handleAndOrOperators") {
+							result.allowed = false;
+							continue;
+						}
 						sb.append(" " & result["sql"]);
+						hasSQL = true;
 					}
 				});
 				results["sql"] = trim(sb.toString());
