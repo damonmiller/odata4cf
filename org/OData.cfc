@@ -41,7 +41,7 @@ component {
 	};
 
 	public string function version() {
-		return "1.1.0a";
+		return "1.1.2a";
 	}
 
 	public struct function parseFilter(required string filter, allowed="none") {
@@ -63,9 +63,14 @@ component {
 		if (structKeyExists(variables, methodName)) {
 			var method = variables[methodName];
 			var results = method(arguments.filter, arguments.allowed);
-			var sb = createObject("java", "java.lang.StringBuilder").init();
-			if (structKeyExists(results, "parsed")) {
-				hasSQL = false;
+
+			if (structKeyExists(results, "allowed") && !results.allowed) {
+				results["sql"] = "";
+				results["parameters"] = {};
+			}
+			else if (structKeyExists(results, "parsed")) {
+				var sb = createObject("java", "java.lang.StringBuilder").init();
+				var hasSQL = false;
 				arrayEach(results.parsed, function(result, i) {
 					if (structKeyExists(result, "allowed") && result.allowed) {
 						// if we hit and/or as first SQL to include, we need to skip it

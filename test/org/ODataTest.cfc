@@ -86,6 +86,10 @@ component extends="mxunit.framework.TestCase" {
 		// verify sql
 		assertEquals("column_b!=:column_b2", result.sql);
 
+		var result = OData.parseFilter("a eq 'b'", ["c"]);
+		$assert.isEqual(0, structCount(result.parameters));
+		$assert.isEqual("", result.sql);
+
 		var result = OData.parseFilter("column_a eq 'value_a' and column_b ne 'value_b' and column_c eq 'value_c'", ["column_d"]);
 		assertEquals(0, structCount(result.parameters));
 		assertEquals("", result.sql);
