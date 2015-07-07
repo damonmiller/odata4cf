@@ -51,7 +51,7 @@
 			<p>You can find known issues or report new issues here: <a href="https://github.com/damonmiller/odata4cf/issues">https://github.com/damonmiller/odata4cf/issues</a></p>
 		</div>
 		<div class="col-md-4">
-			<h3>Tests <small class="label label-info">Railo 4.2+</small></h3>
+			<h3>Tests <small class="label label-info">Lucee 4.5+</small></h3>
 			<p>The OData4CF MXUnit TestSuite is included and can be run locally for you here: <a href="../test/TestSuite.cfm">Click Here</a>.</p>
 		</div>
 	</div>

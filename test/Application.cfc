@@ -32,5 +32,6 @@ component {
 	this.setClientCookies = false;
 
 	this.mappings["/org"] = expandPath("/odata4cf/org");
+	this.mappings[ "/mxunit" ] = expandPath("/testbox/system/compat");
 
 }

@@ -31,12 +31,32 @@ component extends="mxunit.framework.TestCase" {
 		// verify structure of result
 		var result = OData.parseFilter("column eq 'value'");
 		assertTrue(isStruct(result));
-		assertEquals(2, structCount(result));
+		assertEquals(7, structCount(result));
 
-		// verify sql structure
-		assertTrue(structKeyExists(result, "sql"));
-		assertTrue(isSimpleValue(result.sql));
-		assertEquals("column=:column1", result.sql);
+		// verify allowed
+		assertTrue(structKeyExists(result, "allowed"));
+		assertTrue(isBoolean(result.allowed));
+		assertTrue(result.allowed);
+
+		// verify columnName
+		assertTrue(structKeyExists(result, "columnName"));
+		assertTrue(isSimpleValue(result.columnName));
+		assertEquals("column", result.columnName);
+
+		// verify columnValue
+		assertTrue(structKeyExists(result, "columnValue"));
+		assertTrue(isSimpleValue(result.columnValue));
+		assertEquals(":column1", result.columnValue);
+
+		// verify method
+		assertTrue(structKeyExists(result, "method"));
+		assertTrue(isSimpleValue(result.method));
+		assertEquals("handleGenericOperator", result.method);
+
+		// verify operator
+		assertTrue(structKeyExists(result, "operator"));
+		assertTrue(isSimpleValue(result.operator));
+		assertEquals("=", result.operator);
 
 		// verify parameters structure
 		assertTrue(structKeyExists(result, "parameters"));
@@ -44,6 +64,12 @@ component extends="mxunit.framework.TestCase" {
 		assertTrue(structKeyExists(result.parameters, "column1"));
 		assertTrue(isSimpleValue(result.parameters["column1"]));
 		assertEquals("value", result.parameters["column1"]);
+
+		// verify sql
+		assertTrue(structKeyExists(result, "sql"));
+		assertTrue(isSimpleValue(result.sql));
+		assertEquals("column=:column1", result.sql);
+
 	}
 
 	public void function testParseFilter_eq() {

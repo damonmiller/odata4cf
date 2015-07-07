@@ -34,18 +34,21 @@ component {
 		"LeExpression": "<=",
 		"AndExpression": "and",
 		"OrExpression": "or",
-		"NotExpression": "not"
+		"NotExpression": "not",
+		"StartsWithMethodCallExpression": "like",
+		"EndsWithMethodCallExpression": "like",
+		"SubstringOfMethodCallExpression": "like"
 	};
 
 	public string function version() {
-		return "1.0.1a";
+		return "1.1.0a";
 	}
 
-	public struct function parseFilter(required string filter) {
+	public struct function parseFilter(required string filter, allowed="none") {
 		// empty string do not parse by OData
 		if (len(trim(arguments.filter))) {
 			resetParameterCount();
-			return parseODataFilter(createObject("java", "org.odata4j.producer.resources.OptionsQueryParser").parseFilter(javaCast("string", arguments.filter)));
+			return parseODataFilter(createObject("java", "org.odata4j.producer.resources.OptionsQueryParser").parseFilter(javaCast("string", arguments.filter)), arguments.allowed);
 		}
 		return {
 			"sql": "",
@@ -53,61 +56,203 @@ component {
 		};
 	}
 
-	private function parseODataFilter(required filter) {
-		var result = createObject("java", "java.lang.StringBuilder").init();
+	private struct function parseODataFilter(required filter, required allowed) {
+		var methodName = arguments.filter.toString();
+
+		// look for a method to handle this expression
+		if (structKeyExists(variables, methodName)) {
+			var method = variables[methodName];
+			var results = method(arguments.filter, arguments.allowed);
+			var sb = createObject("java", "java.lang.StringBuilder").init();
+			if (structKeyExists(results, "parsed")) {
+				arrayEach(results.parsed, function(result) {
+					if (structKeyExists(result, "allowed") && result.allowed) {
+						sb.append(" " & result["sql"]);
+					}
+				});
+				results["sql"] = trim(sb.toString());
+			}
+			return results;
+		}
+
+		UnhandledExpression("Could not convert expression to SQL.", "Type '" & methodName & "' unaccounted for.");
+	}
+
+	/* BEGIN Expression handlers */
+
+	// eq
+	private function EqExpression(required filter, required allowed) {
+		return handleGenericOperator(arguments.filter, arguments.allowed);
+	}
+
+	// ne
+	private function NeExpression(required filter, required allowed) {
+		return handleGenericOperator(arguments.filter, arguments.allowed);
+	}
+
+	// gt
+	private function GtExpression(required filter, required allowed) {
+		return handleGenericOperator(arguments.filter, arguments.allowed);
+	}
+
+	// ge
+	private function GeExpression(required filter, required allowed) {
+		return handleGenericOperator(arguments.filter, arguments.allowed);
+	}
+
+	// lt
+	private function LtExpression(required filter, required allowed) {
+		return handleGenericOperator(arguments.filter, arguments.allowed);
+	}
+
+	// le
+	private function LeExpression(required filter, required allowed) {
+		return handleGenericOperator(arguments.filter, arguments.allowed);
+	}
+
+	// startswith(col, val)
+	private function StartsWithMethodCallExpression(required filter, required allowed) {
+		return handleLikeOperator(arguments.filter, arguments.allowed);
+	}
+
+	// endswith(col, val)
+	private function EndsWithMethodCallExpression(required filter, required allowed) {
+		return handleLikeOperator(arguments.filter, arguments.allowed);
+	}
+
+	// substringof(val, col)
+	private function SubstringOfMethodCallExpression(required filter, required allowed) {
+		return handleLikeOperator(arguments.filter, arguments.allowed);
+	}
+
+	// and
+	private function AndExpression(required filter, required allowed) {
+		return handleAndOrOperators(arguments.filter, arguments.allowed);
+	}
+
+	// or
+	private function OrExpression(required filter, required allowed) {
+		return handleAndOrOperators(arguments.filter, arguments.allowed);
+	}
+
+	// -unhandled-
+	private void function UnhandledExpression(required string message, required string detail) {
+		// how should we handle this?  log it? throw an error/abort?
+		throw(type="org.odata.errors.UnhandledExpression", message=arguments.message, detail=arguments.detail);
+		abort;
+	}
+
+	/* END Expression handlers */
+
+	private function handleGenericOperator(required filter, required allowed) {
+		var operator = arguments.filter.toString();
+		var sql = createObject("java", "java.lang.StringBuilder").init();
 		var params = {};
-		var filterType = arguments.filter.toString();
 
-		if (listFind("EqExpression,NeExpression,GtExpression,GeExpression,LtExpression,LeExpression", filterType)) {
-			if (arguments.filter.getLHS().toString() == "EntitySimpleProperty") {
-				var queryPropertyName = arguments.filter.getLHS().getPropertyName();
-				var propertyName = wrapInParameterCount(queryPropertyName);
-				result.append(queryPropertyName & variables.operatorsMap[filterType] & ":" & propertyName);
-				params[propertyName] = arguments.filter.getRHS().getValue();
-			}
-			else {
-				unhandledExpression("Could not convert expression to SQL.", "Type '" & arguments.filter.getLHS().toString() & "' unaccounted for.");
-			}
-		}
-		else if (listFind("StartsWithMethodCallExpression,EndsWithMethodCallExpression,SubstringOfMethodCallExpression", filterType)) {
-			var queryPropertyName = arguments.filter.getTarget().getPropertyName();
-			var propertyName = wrapInParameterCount(queryPropertyName);
-			result.append(queryPropertyName & " like :" & propertyName);
-			if (filterType == "StartsWithMethodCallExpression") {
-				// startswith converts to 'LIKE value%'
-				params[propertyName] = arguments.filter.getValue().getValue() & "%";
-			}
-			else if (filterType == "EndsWithMethodCallExpression") {
-				// endswith converts to 'LIKE %value'
-				params[propertyName] = "%" & arguments.filter.getValue().getValue();
-			}
-			else if (filterType == "SubstringOfMethodCallExpression") {
-				// substringof converts to 'LIKE %value%'
-				params[propertyName] = "%" & arguments.filter.getValue().getValue() & "%";
-			}
-		}
-		else if (listFind("AndExpression,OrExpression", filterType)) {
-			// recursively call method passing LHS object
-			var lResult = parseODataFilter(arguments.filter.getLHS());
-			// add returned SQL to our SQL
-			result.append(lResult.sql);
-			// merge parameters together
-			params.putAll(lResult.parameters);
+		if (arguments.filter.getLHS().toString() == "EntitySimpleProperty") {
+			var columnName = arguments.filter.getLHS().getPropertyName();
+			var columnValue = wrapInParameterCount(columnName);
+			sql.append(columnName & variables.operatorsMap[operator] & ":" & columnValue);
+			params[columnValue] = arguments.filter.getRHS().getValue();
 
-			// recursively call method passing RHS object
-			var rResult = parseODataFilter(arguments.filter.getRHS());
-			// add returned SQL to our SQL with proper operator
-			result.append(" " & variables.operatorsMap[filterType] & " " & rResult.sql);
-			// merge parameters together
-			params.putAll(rResult.parameters);
+			return {
+				"method": "handleGenericOperator",
+				"columnName": columnName,
+				"columnValue": ":" & columnValue,
+				"operator": variables.operatorsMap[operator],
+				"sql": sql.toString(),
+				"parameters": params,
+				"allowed": (isArray(arguments.allowed) ? true : false) ? isParameterAllowed(arguments.allowed, columnName) : true
+			};
 		}
-		else {
-			unhandledExpression("Could not convert expression to SQL.", "Type '" & filterType & "' unaccounted for.");
+
+		UnhandledExpression("Could not convert expression to SQL.", "Type '" & arguments.filter.getLHS().toString() & "' unaccounted for.");
+	}
+
+	private function handleLikeOperator(required filter, required allowed) {
+		var operator = arguments.filter.toString();
+		var sql = createObject("java", "java.lang.StringBuilder").init();
+		var params = {};
+
+		var columnName = arguments.filter.getTarget().getPropertyName();
+		var columnValue = wrapInParameterCount(columnName);
+		sql.append(columnName & " like :" & columnValue);
+		if (operator == "StartsWithMethodCallExpression") {
+			// startswith converts to 'LIKE value%'
+			params[columnValue] = arguments.filter.getValue().getValue() & "%";
+		}
+		else if (operator == "EndsWithMethodCallExpression") {
+			// endswith converts to 'LIKE %value'
+			params[columnValue] = "%" & arguments.filter.getValue().getValue();
+		}
+		else if (operator == "SubstringOfMethodCallExpression") {
+			// substringof converts to 'LIKE %value%'
+			params[columnValue] = "%" & arguments.filter.getValue().getValue() & "%";
 		}
 
 		return {
-			"sql": result.toString(),
-			"parameters": params
+			"method": "handleLikeOperator",
+			"columnName": columnName,
+			"columnValue": ":" & columnValue,
+			"operator": variables.operatorsMap[operator],
+			"sql": sql.toString(),
+			"parameters": params,
+			"allowed": (isArray(arguments.allowed) ? true : false) ? isParameterAllowed(arguments.allowed, columnName) : true
+		};
+	}
+
+	private function handleAndOrOperators(required filter, required allowed) {
+		var parsed = [];
+		var operator = arguments.filter.toString();
+		var sql = createObject("java", "java.lang.StringBuilder").init();
+		var params = {};
+
+		// recursively call method passing LHS object
+		var lResult = parseODataFilter(arguments.filter.getLHS(), arguments.allowed);
+		if (lResult.allowed) {
+			// add returned SQL to our SQL
+			sql.append(lResult.sql);
+			// merge parameters together
+			params.putAll(lResult.parameters);
+		}
+		arrayAppend(parsed, lResult);
+
+		// recursively call method passing RHS object
+		var rResult = parseODataFilter(arguments.filter.getRHS(), arguments.allowed);
+
+		if (structKeyExists(rResult, "allowed")) {
+			arrayAppend(parsed, {
+				"method": "handleAndOrOperators",
+				"allowed": rResult.allowed,
+				"sql": variables.operatorsMap[operator]
+			});
+			if (rResult.allowed) {
+				// merge parameters together
+				params.putAll(rResult.parameters);
+				structDelete(rResult, "parameters");
+			}
+		}
+		else if (structKeyExists(rResult, "parsed") && isArray(rResult.parsed)) {
+			arrayAppend(parsed, {
+				"method": "handleAndOrOperators",
+				"allowed": rResult.parsed[1].allowed,
+				"sql": variables.operatorsMap[operator]
+			});
+			// merge parameters together
+			params.putAll(rResult.parameters);
+			structDelete(rResult, "parameters");
+			// merge parsed together
+			parsed.addAll(rResult.parsed);
+			structDelete(rResult, "parsed");
+		}
+
+		if (structKeyExists(rResult, "method")) {
+			arrayAppend(parsed, rResult);
+		}
+
+		return {
+			"parameters": params,
+			"parsed": parsed
 		};
 	}
 
@@ -119,10 +264,11 @@ component {
 		variables.parameterCount = 0;
 	}
 
-	private void function unhandledExpression(required string message, required string detail) {
-		// how should we handle this?  log it? throw an error/abort?
-		throw(type="org.odata.errors.UnhandledExpression", message=arguments.message, detail=arguments.detail);
-		abort;
+	private boolean function isParameterAllowed(required array allowed, required string parameterName) {
+		if (arrayFind(arguments.allowed, arguments.parameterName)) {
+			return true;
+		}
+		return false;
 	}
 
 }
