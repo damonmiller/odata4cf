@@ -1,5 +1,5 @@
 /*
-	OData for ColdFusion and Railo Applications
+	OData for ColdFusion and Lucee Applications
 
 	The MIT License (MIT)
 
@@ -27,21 +27,21 @@ component {
 
 	variables.operatorsMap = {
 		"EqExpression": "=",
-		"NeExpression": "!=",
-		"GtExpression": ">",
-		"GeExpression": ">=",
-		"LtExpression": "<",
-		"LeExpression": "<=",
 		"AndExpression": "and",
 		"OrExpression": "or",
-		"NotExpression": "not",
-		"StartsWithMethodCallExpression": "like",
+		"LtExpression": "<",
+		"GtExpression": ">",
+		"GeExpression": ">=",
+		"LeExpression": "<=",
+		"NeExpression": "<>",
 		"EndsWithMethodCallExpression": "like",
-		"SubstringOfMethodCallExpression": "like"
+		"StartsWithMethodCallExpression": "like",
+		"SubstringOfMethodCallExpression": "like",
+		"LengthMethodCallExpression": "len"
 	};
 
 	public string function version() {
-		return "1.1.2a";
+		return "1.1.3a";
 	}
 
 	public struct function parseFilter(required string filter, allowed="none") {
@@ -96,8 +96,18 @@ component {
 		return handleGenericOperator(arguments.filter, arguments.allowed);
 	}
 
-	// ne
-	private function NeExpression(required filter, required allowed) {
+	// and
+	private function AndExpression(required filter, required allowed) {
+		return handleAndOrOperators(arguments.filter, arguments.allowed);
+	}
+
+	// or
+	private function OrExpression(required filter, required allowed) {
+		return handleAndOrOperators(arguments.filter, arguments.allowed);
+	}
+
+	// lt
+	private function LtExpression(required filter, required allowed) {
 		return handleGenericOperator(arguments.filter, arguments.allowed);
 	}
 
@@ -111,19 +121,14 @@ component {
 		return handleGenericOperator(arguments.filter, arguments.allowed);
 	}
 
-	// lt
-	private function LtExpression(required filter, required allowed) {
-		return handleGenericOperator(arguments.filter, arguments.allowed);
-	}
-
 	// le
 	private function LeExpression(required filter, required allowed) {
 		return handleGenericOperator(arguments.filter, arguments.allowed);
 	}
 
-	// startswith(col, val)
-	private function StartsWithMethodCallExpression(required filter, required allowed) {
-		return handleLikeOperator(arguments.filter, arguments.allowed);
+	// ne
+	private function NeExpression(required filter, required allowed) {
+		return handleGenericOperator(arguments.filter, arguments.allowed);
 	}
 
 	// endswith(col, val)
@@ -131,19 +136,14 @@ component {
 		return handleLikeOperator(arguments.filter, arguments.allowed);
 	}
 
-	// substringof(val, col)
-	private function SubstringOfMethodCallExpression(required filter, required allowed) {
+	// startswith(col, val)
+	private function StartsWithMethodCallExpression(required filter, required allowed) {
 		return handleLikeOperator(arguments.filter, arguments.allowed);
 	}
 
-	// and
-	private function AndExpression(required filter, required allowed) {
-		return handleAndOrOperators(arguments.filter, arguments.allowed);
-	}
-
-	// or
-	private function OrExpression(required filter, required allowed) {
-		return handleAndOrOperators(arguments.filter, arguments.allowed);
+	// substringof(val, col)
+	private function SubstringOfMethodCallExpression(required filter, required allowed) {
+		return handleLikeOperator(arguments.filter, arguments.allowed);
 	}
 
 	// -unhandled-
@@ -163,7 +163,26 @@ component {
 		if (arguments.filter.getLHS().toString() == "EntitySimpleProperty") {
 			var columnName = arguments.filter.getLHS().getPropertyName();
 			var columnValue = wrapInParameterCount(columnName);
-			sql.append(columnName & variables.operatorsMap[operator] & ":" & columnValue);
+			var isNull = false;
+			if (arguments.filter.getRHS().toString() == "NullLiteral") isNull = true;
+			sql.append(columnName & " " & variables.operatorsMap[operator] & " " & (isNull ? "null" : ":" & columnValue));
+			if (!isNull) params[columnValue] = arguments.filter.getRHS().getValue();
+
+			return {
+				"method": "handleGenericOperator",
+				"columnName": columnName,
+				"columnValue": ":" & columnValue,
+				"operator": variables.operatorsMap[operator],
+				"isNull": isNull,
+				"sql": sql.toString(),
+				"parameters": params,
+				"allowed": (isArray(arguments.allowed) ? true : false) ? isParameterAllowed(arguments.allowed, columnName) : true
+			};
+		}
+		else if (arguments.filter.getLHS().toString() == "LengthMethodCallExpression") {
+			var columnName = arguments.filter.getLHS().getExpression().getPropertyName();
+			var columnValue = wrapInParameterCount(columnName);
+			sql.append("len(" & columnName & ") " & variables.operatorsMap[operator] & " :" & columnValue);
 			params[columnValue] = arguments.filter.getRHS().getValue();
 
 			return {

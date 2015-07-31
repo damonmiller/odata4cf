@@ -31,7 +31,7 @@ component extends="mxunit.framework.TestCase" {
 		// verify structure of result
 		var result = OData.parseFilter("column eq 'value'");
 		assertTrue(isStruct(result));
-		assertEquals(7, structCount(result));
+		assertEquals(8, structCount(result));
 
 		// verify allowed
 		assertTrue(structKeyExists(result, "allowed"));
@@ -68,7 +68,7 @@ component extends="mxunit.framework.TestCase" {
 		// verify sql
 		assertTrue(structKeyExists(result, "sql"));
 		assertTrue(isSimpleValue(result.sql));
-		assertEquals("column=:column1", result.sql);
+		assertEquals("column = :column1", result.sql);
 	}
 
 	public void function testParseFilter_allowed() {
@@ -84,7 +84,7 @@ component extends="mxunit.framework.TestCase" {
 		assertEquals("value_b", result.parameters["column_b2"]);
 
 		// verify sql
-		assertEquals("column_b!=:column_b2", result.sql);
+		assertEquals("column_b <> :column_b2", result.sql);
 
 		var result = OData.parseFilter("a eq 'b'", ["c"]);
 		$assert.isEqual(0, structCount(result.parameters));
@@ -97,19 +97,15 @@ component extends="mxunit.framework.TestCase" {
 		var result = OData.parseFilter("a eq 'b' and b eq 'c' and d eq 'e' and c eq 'd'", ["a","b","c"]);
 		$assert.isEqual(3, structCount(result.parameters));
 		$assert.isFalse(structKeyExists(result.parameters, "d3"));
-		$assert.isEqual("a=:a1 and b=:b2 and c=:c4", result.sql);
+		$assert.isEqual("a = :a1 and b = :b2 and c = :c4", result.sql);
 	}
 
 	public void function testParseFilter_eq() {
 		var OData = new org.OData();
 
-		var result = OData.parseFilter("firstName eq 'john'");
-		assertEquals("firstName=:firstName1", result.sql);
-		assertEquals("john", result.parameters["firstName1"]);
-
-		var result = OData.parseFilter("lastName eq 'doe'");
-		assertEquals("lastName=:lastName1", result.sql);
-		assertEquals("doe", result.parameters["lastName1"]);
+		var result = OData.parseFilter("City eq 'Miami'");
+		assertEquals("City = :City1", result.sql);
+		assertEquals("Miami", result.parameters["City1"]);
 
 		// check for irish bug
 		var result = OData.parseFilter("lastName eq 'O''Malley'");
@@ -125,94 +121,120 @@ component extends="mxunit.framework.TestCase" {
 		//FAILS: result = OData.parseFilter("firstName Eq 'john'");
 	}
 
-	public void function testParseFilter_ne() {
-		var OData = new org.OData();
-
-		var result = OData.parseFilter("isDeleted ne 0");
-		assertEquals("isDeleted!=:isDeleted1", result.sql);
-		assertEquals(0, result.parameters["isDeleted1"]);
-	}
-
-	public void function testParseFilter_gt() {
-		var OData = new org.OData();
-
-		var result = OData.parseFilter("count gt 42");
-		assertEquals("count>:count1", result.sql);
-		assertEquals(42, result.parameters["count1"]);
-	}
-
-	public void function testParseFilter_ge() {
-		var OData = new org.OData();
-
-		var result = OData.parseFilter("count ge 42");
-		assertEquals("count>=:count1", result.sql);
-		assertEquals(42, result.parameters["count1"]);
-	}
-
-	public void function testParseFilter_lt() {
-		var OData = new org.OData();
-
-		var result = OData.parseFilter("count lt 42");
-		assertEquals("count<:count1", result.sql);
-		assertEquals(42, result.parameters["count1"]);
-	}
-
-	public void function testParseFilter_le() {
-		var OData = new org.OData();
-
-		var result = OData.parseFilter("count le 42");
-		assertEquals("count<=:count1", result.sql);
-		assertEquals(42, result.parameters["count1"]);
-	}
-
-	public void function testParseFilter_startswith() {
-		var OData = new org.OData();
-
-		var result = OData.parseFilter("startswith(firstName, 'jo')");
-		assertEquals("firstName like :firstName1", result.sql);
-		assertEquals("jo%", result.parameters["firstName1"]);
-	}
-
-	public void function testParseFilter_endswith() {
-		var OData = new org.OData();
-
-		var result = OData.parseFilter("endswith(firstName, 'hn')");
-		assertEquals("firstName like :firstName1", result.sql);
-		assertEquals("%hn", result.parameters["firstName1"]);
-	}
-
-	public void function testParseFilter_substringOf() {
-		var OData = new org.OData();
-
-		var result = OData.parseFilter("substringof('oh', firstName)");
-		assertEquals("firstName like :firstName1", result.sql);
-		assertEquals("%oh%", result.parameters["firstName1"]);
-	}
-
 	public void function testParseFilter_and() {
 		var OData = new org.OData();
 
-		var result = OData.parseFilter("firstName eq 'john' and lastName eq 'doe'");
-		assertEquals("firstName=:firstName1 and lastName=:lastName2", result.sql);
-		assertEquals("john", result.parameters["firstName1"]);
-		assertEquals("doe", result.parameters["lastName2"]);
-
-		var result = OData.parseFilter("substringof('jo', firstName) and substringof('hn', firstName)");
-		assertEquals("firstName like :firstName1 and firstName like :firstName2", result.sql);
-		assertEquals("%jo%", result.parameters["firstName1"]);
-		assertEquals("%hn%", result.parameters["firstName2"]);
-
+		var result = OData.parseFilter("Country_Region_Code eq 'ES' and Payment_Terms_Code eq '14 DAYS'");
+		assertEquals("Country_Region_Code = :Country_Region_Code1 and Payment_Terms_Code = :Payment_Terms_Code2", result.sql);
+		assertEquals("ES", result.parameters["Country_Region_Code1"]);
+		assertEquals("14 DAYS", result.parameters["Payment_Terms_Code2"]);
 	}
 
 	public void function testParseFilter_or() {
 		var OData = new org.OData();
 
-		var result = OData.parseFilter("firstName eq 'john' or firstName eq 'jane'");
-		assertEquals("firstName=:firstName1 or firstName=:firstName2", result.sql);
-		assertEquals("john", result.parameters["firstName1"]);
-		assertEquals("jane", result.parameters["firstName2"]);
+		var result = OData.parseFilter("Country_Region_Code eq 'ES' or Country_Region_Code eq 'US'");
+		assertEquals("Country_Region_Code = :Country_Region_Code1 or Country_Region_Code = :Country_Region_Code2", result.sql);
+		assertEquals("ES", result.parameters["Country_Region_Code1"]);
+		assertEquals("US", result.parameters["Country_Region_Code2"]);
 
 	}
+
+	public void function testParseFilter_lt() {
+		var OData = new org.OData();
+
+		var result = OData.parseFilter("Entry_No lt 610");
+		assertEquals("Entry_No < :Entry_No1", result.sql);
+		assertEquals(610, result.parameters["Entry_No1"]);
+	}
+
+	public void function testParseFilter_gt() {
+		var OData = new org.OData();
+
+		var result = OData.parseFilter("Entry_No gt 610");
+		assertEquals("Entry_No > :Entry_No1", result.sql);
+		assertEquals(610, result.parameters["Entry_No1"]);
+	}
+
+	public void function testParseFilter_ge() {
+		var OData = new org.OData();
+
+		var result = OData.parseFilter("Entry_No ge 610");
+		assertEquals("Entry_No >= :Entry_No1", result.sql);
+		assertEquals(610, result.parameters["Entry_No1"]);
+	}
+
+	public void function testParseFilter_le() {
+		var OData = new org.OData();
+
+		var result = OData.parseFilter("Entry_No le 610");
+		assertEquals("Entry_No <= :Entry_No1", result.sql);
+		assertEquals(610, result.parameters["Entry_No1"]);
+	}
+
+	public void function testParseFilter_ne() {
+		var OData = new org.OData();
+
+		var result = OData.parseFilter("VAT_Bus_Posting_Group ne 'EXPORT'");
+		assertEquals("VAT_Bus_Posting_Group <> :VAT_Bus_Posting_Group1", result.sql);
+		assertEquals("EXPORT", result.parameters["VAT_Bus_Posting_Group1"]);
+	}
+
+	public void function testParseFilter_endswith() {
+		var OData = new org.OData();
+
+		var result = OData.parseFilter("endswith(VAT_Bus_Posting_Group,'RT')");
+		assertEquals("VAT_Bus_Posting_Group like :VAT_Bus_Posting_Group1", result.sql);
+		assertEquals("%RT", result.parameters["VAT_Bus_Posting_Group1"]);
+	}
+
+	public void function testParseFilter_startswith() {
+		var OData = new org.OData();
+
+		var result = OData.parseFilter("startswith(Name, 'S')");
+		assertEquals("Name like :Name1", result.sql);
+		assertEquals("S%", result.parameters["Name1"]);
+	}
+
+	public void function testParseFilter_substringof() {
+		var OData = new org.OData();
+
+		var result = OData.parseFilter("substringof('urn', Name)");
+		assertEquals("Name like :Name1", result.sql);
+		assertEquals("%urn%", result.parameters["Name1"]);
+	}
+
+	public void function testParseFilter_length() {
+		var OData = new org.OData();
+
+		var result = OData.parseFilter("length(Name) gt 20");
+		assertEquals("len(Name) > :Name1", result.sql);
+		assertEquals(20, result.parameters["Name1"]);
+	}
+
+	/*public void function testParseFilter_indexof() {
+		var OData = new org.OData();
+
+		var result = OData.parseFilter("indexof(Location_Code, 'BLUE') eq 0");
+		assertEquals("charindex(Location_Code, :Location_Code1) = 0", result.sql);
+		assertEquals("BLUE", result.parameters["Location_Code1"]);
+	}
+
+	public void function testParseFilter_replace() {
+		var OData = new org.OData();
+
+		var result = OData.parseFilter("replace(City, 'Miami', 'Tampa') eq 'CODERED'");
+		assertEquals("replace(City, :City1, 'Tampa') = 'CODERED'", result.sql);
+		assertEquals("Miami", result.parameters["City1"]);
+	}
+
+	public void function testParseFilter_substring() {
+		var OData = new org.OData();
+
+		var result = OData.parseFilter("substring(Location_Code, 5) eq 'RED'");
+		assertEquals("substring(Location_Code, 5) = :Location_Code1", result.sql);
+		assertEquals("RED", result.parameters["Location_Code1"]);
+	}*/
 
 	// NOTE: need to test paranthesis, not, arithmetic operators, and other methods not noted above
 
