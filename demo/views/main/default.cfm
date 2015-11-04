@@ -1,6 +1,6 @@
 <!---
 /*
-	OData for ColdFusion and Railo Applications
+	OData for ColdFusion and Lucee Applications
 
 	The MIT License (MIT)
 
@@ -34,7 +34,7 @@
 
 	<div class="jumbotron">
 		<h1>OData4CF</h1>
-		<p>OData for ColdFusion and Railo Applications</p>
+		<p>OData for ColdFusion and Lucee Applications</p>
 	</div>
 
 	<div class="row">
@@ -52,7 +52,7 @@
 		</div>
 		<div class="col-md-4">
 			<h3>Tests <small class="label label-info">Lucee 4.5+</small></h3>
-			<p>The OData4CF MXUnit TestSuite is included and can be run locally for you here: <a href="../test/TestSuite.cfm">Click Here</a>.</p>
+			<p>The OData4CF TestBox browser is included and can be run locally for you here: <a href="../test/">Click Here</a>.</p>
 		</div>
 	</div>
 

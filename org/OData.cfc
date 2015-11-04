@@ -25,259 +25,146 @@
 */
 component {
 
-	variables.operatorsMap = {
+	variables.ODataTypeMap = {
 		"EqExpression": "=",
-		"AndExpression": "and",
-		"OrExpression": "or",
+		"AndExpression": "AND",
+		"OrExpression": "OR",
 		"LtExpression": "<",
 		"GtExpression": ">",
 		"GeExpression": ">=",
 		"LeExpression": "<=",
 		"NeExpression": "<>",
-		"EndsWithMethodCallExpression": "like",
-		"StartsWithMethodCallExpression": "like",
-		"SubstringOfMethodCallExpression": "like",
-		"LengthMethodCallExpression": "len"
+		"EndsWithMethodCallExpression": "LIKE",
+		"StartsWithMethodCallExpression": "LIKE",
+		"SubstringOfMethodCallExpression": "LIKE",
+		"LengthMethodCallExpression": "LEN",
+		"IndexOfMethodCallExpression": "CHARINDEX",
+		"ReplaceMethodCallExpression": "REPLACE",
+		"SubstringMethodCallExpression": "SUBSTRING",
+		"ToLowerMethodCallExpression": "LOWER",
+		"ToUpperMethodCallExpression": "UPPER",
+		"TrimMethodCallExpression": "TRIM",
+		"ConcatMethodCallExpression": "CONCAT",
+		"DayMethodCallExpression": "DAY",
+		"MonthMethodCallExpression": "MONTH",
+		"YearMethodCallExpression": "YEAR",
+		"HourMethodCallExpression": "HOUR",
+		"MinuteMethodCallExpression": "MINUTE",
+		"SecondMethodCallExpression": "SECOND",
+		"RoundMethodCallExpression": "ROUND",
+		"FloorMethodCallExpression": "FLOOR",
+		"CeilingMethodCallExpression": "CEILING"
 	};
 
 	public string function version() {
-		return "1.1.3a";
+		return "1.2.0";
 	}
 
 	public struct function parseFilter(required string filter, allowed="none") {
-		// empty string do not parse by OData
-		if (len(trim(arguments.filter))) {
-			resetParameterCount();
-			return parseODataFilter(createObject("java", "org.odata4j.producer.resources.OptionsQueryParser").parseFilter(javaCast("string", arguments.filter)), arguments.allowed);
-		}
-		return {
-			"sql": "",
-			"parameters": {}
-		};
+		// OData4J will not parse empty strings
+		if (!len(trim(arguments.filter))) return {"SQL": "", "parameters": {}};
+
+		resetParameterCount();
+		var result = parseODataFilter(createObject("java", "org.odata4j.producer.resources.OptionsQueryParser").parseFilter(javaCast("string", arguments.filter)), arguments.allowed);
+		return result;
 	}
 
 	private struct function parseODataFilter(required filter, required allowed) {
-		var methodName = arguments.filter.toString();
+		var ODataType = arguments.filter.toString();
 
-		// look for a method to handle this expression
-		if (structKeyExists(variables, methodName)) {
-			var method = variables[methodName];
-			var results = method(arguments.filter, arguments.allowed);
+		// error if there is no expression handler found
+		if (!structKeyExists(variables, ODataType)) {
+			_unhandled("Could not convert expression to SQL.", "Type '" & ODataType & "' unaccounted for.");
+		}
 
-			if (structKeyExists(results, "allowed") && !results.allowed) {
-				results["sql"] = "";
-				results["parameters"] = {};
-			}
-			else if (structKeyExists(results, "parsed")) {
-				var sb = createObject("java", "java.lang.StringBuilder").init();
-				var hasSQL = false;
-				arrayEach(results.parsed, function(result, i) {
-					if (structKeyExists(result, "allowed") && result.allowed) {
-						// if we hit and/or as first SQL to include, we need to skip it
-						if (!hasSQL && result.method == "handleAndOrOperators") {
-							continue;
-						}
-						sb.append(" " & result["sql"]);
-						hasSQL = true;
+		var method = variables[ODataType];
+		var results = method(arguments.filter, arguments.allowed);
+
+		if (structKeyExists(results, "allowed") && !results.allowed) {
+			results["SQL"] = "";
+			results["parameters"] = {};
+		}
+		else if (structKeyExists(results, "parsed")) {
+			var sb = createObject("java", "java.lang.StringBuilder").init();
+			var hasSQL = false;
+			arrayEach(results.parsed, function(result, i) {
+				if (structKeyExists(result, "allowed") && result.allowed) {
+					// if we hit and/or as first SQL to include, we need to skip it
+					if (!hasSQL && listFind("AndExpression,OrExpression", result["ODataType"])) {
+						continue;
 					}
-				});
-				results["sql"] = trim(sb.toString());
-			}
-			return results;
+					sb.append(" " & result["SQL"]);
+					hasSQL = true;
+				}
+			});
+			results["SQL"] = trim(sb.toString());
 		}
-
-		UnhandledExpression("Could not convert expression to SQL.", "Type '" & methodName & "' unaccounted for.");
+		return results;
 	}
 
-	/* BEGIN Expression handlers */
+	/* BEGIN: Expression handlers */
 
-	// eq
-	private function EqExpression(required filter, required allowed) {
-		return handleGenericOperator(arguments.filter, arguments.allowed);
+	// AddExpression (BinaryCommonExpression)
+	private function AddExpression(required filter, required allowed) {
+		return BinaryCommonExpression(arguments.filter, arguments.allowed);
 	}
 
-	// and
+	// TODO: AggregateAllFunction (AggregateBoolFunction, BoolCommonExpression)
+	// TODO: AggregateAnyFunction (AggregateBoolFunction, BoolCommonExpression)
+
+	// AndExpression (BinaryBoolCommonExpression, BoolCommonExpression)
 	private function AndExpression(required filter, required allowed) {
-		return handleAndOrOperators(arguments.filter, arguments.allowed);
+		return BinaryBoolCommonExpression(arguments.filter, arguments.allowed);
 	}
 
-	// or
-	private function OrExpression(required filter, required allowed) {
-		return handleAndOrOperators(arguments.filter, arguments.allowed);
-	}
-
-	// lt
-	private function LtExpression(required filter, required allowed) {
-		return handleGenericOperator(arguments.filter, arguments.allowed);
-	}
-
-	// gt
-	private function GtExpression(required filter, required allowed) {
-		return handleGenericOperator(arguments.filter, arguments.allowed);
-	}
-
-	// ge
-	private function GeExpression(required filter, required allowed) {
-		return handleGenericOperator(arguments.filter, arguments.allowed);
-	}
-
-	// le
-	private function LeExpression(required filter, required allowed) {
-		return handleGenericOperator(arguments.filter, arguments.allowed);
-	}
-
-	// ne
-	private function NeExpression(required filter, required allowed) {
-		return handleGenericOperator(arguments.filter, arguments.allowed);
-	}
-
-	// endswith(col, val)
-	private function EndsWithMethodCallExpression(required filter, required allowed) {
-		return handleLikeOperator(arguments.filter, arguments.allowed);
-	}
-
-	// startswith(col, val)
-	private function StartsWithMethodCallExpression(required filter, required allowed) {
-		return handleLikeOperator(arguments.filter, arguments.allowed);
-	}
-
-	// substringof(val, col)
-	private function SubstringOfMethodCallExpression(required filter, required allowed) {
-		return handleLikeOperator(arguments.filter, arguments.allowed);
-	}
-
-	// -unhandled-
-	private void function UnhandledExpression(required string message, required string detail) {
-		// how should we handle this?  log it? throw an error/abort?
-		throw(type="org.odata.errors.UnhandledExpression", message=arguments.message, detail=arguments.detail);
-		abort;
-	}
-
-	/* END Expression handlers */
-
-	private function handleGenericOperator(required filter, required allowed) {
-		var operator = arguments.filter.toString();
-		var sql = createObject("java", "java.lang.StringBuilder").init();
-		var params = {};
-
-		if (arguments.filter.getLHS().toString() == "EntitySimpleProperty") {
-			var columnName = arguments.filter.getLHS().getPropertyName();
-			var columnValue = wrapInParameterCount(columnName);
-			var isNull = false;
-			if (arguments.filter.getRHS().toString() == "NullLiteral") isNull = true;
-			sql.append(columnName & " " & variables.operatorsMap[operator] & " " & (isNull ? "null" : ":" & columnValue));
-			if (!isNull) params[columnValue] = arguments.filter.getRHS().getValue();
-
-			return {
-				"method": "handleGenericOperator",
-				"columnName": columnName,
-				"columnValue": ":" & columnValue,
-				"operator": variables.operatorsMap[operator],
-				"isNull": isNull,
-				"sql": sql.toString(),
-				"parameters": params,
-				"allowed": (isArray(arguments.allowed) ? true : false) ? isParameterAllowed(arguments.allowed, columnName) : true
-			};
-		}
-		else if (arguments.filter.getLHS().toString() == "LengthMethodCallExpression") {
-			var columnName = arguments.filter.getLHS().getExpression().getPropertyName();
-			var columnValue = wrapInParameterCount(columnName);
-			sql.append("len(" & columnName & ") " & variables.operatorsMap[operator] & " :" & columnValue);
-			params[columnValue] = arguments.filter.getRHS().getValue();
-
-			return {
-				"method": "handleGenericOperator",
-				"columnName": columnName,
-				"columnValue": ":" & columnValue,
-				"operator": variables.operatorsMap[operator],
-				"sql": sql.toString(),
-				"parameters": params,
-				"allowed": (isArray(arguments.allowed) ? true : false) ? isParameterAllowed(arguments.allowed, columnName) : true
-			};
-		}
-
-		UnhandledExpression("Could not convert expression to SQL.", "Type '" & arguments.filter.getLHS().toString() & "' unaccounted for.");
-	}
-
-	private function handleLikeOperator(required filter, required allowed) {
-		var operator = arguments.filter.toString();
-		var sql = createObject("java", "java.lang.StringBuilder").init();
-		var params = {};
-
-		var columnName = arguments.filter.getTarget().getPropertyName();
-		var columnValue = wrapInParameterCount(columnName);
-		sql.append(columnName & " like :" & columnValue);
-		if (operator == "StartsWithMethodCallExpression") {
-			// startswith converts to 'LIKE value%'
-			params[columnValue] = arguments.filter.getValue().getValue() & "%";
-		}
-		else if (operator == "EndsWithMethodCallExpression") {
-			// endswith converts to 'LIKE %value'
-			params[columnValue] = "%" & arguments.filter.getValue().getValue();
-		}
-		else if (operator == "SubstringOfMethodCallExpression") {
-			// substringof converts to 'LIKE %value%'
-			params[columnValue] = "%" & arguments.filter.getValue().getValue() & "%";
-		}
-
-		return {
-			"method": "handleLikeOperator",
-			"columnName": columnName,
-			"columnValue": ":" & columnValue,
-			"operator": variables.operatorsMap[operator],
-			"sql": sql.toString(),
-			"parameters": params,
-			"allowed": (isArray(arguments.allowed) ? true : false) ? isParameterAllowed(arguments.allowed, columnName) : true
-		};
-	}
-
-	private function handleAndOrOperators(required filter, required allowed) {
+	// BinaryBoolCommonExpression
+	private function BinaryBoolCommonExpression(required filter, required allowed) {
 		var parsed = [];
-		var operator = arguments.filter.toString();
+		var ODataType = arguments.filter.toString();
 		var sql = createObject("java", "java.lang.StringBuilder").init();
 		var params = {};
 
 		// recursively call method passing LHS object
-		var lResult = parseODataFilter(arguments.filter.getLHS(), arguments.allowed);
-		if (lResult.allowed) {
+		var lhs = parseODataFilter(arguments.filter.getLHS(), arguments.allowed);
+		if (lhs.allowed) {
 			// add returned SQL to our SQL
-			sql.append(lResult.sql);
+			sql.append(lhs.sql);
 			// merge parameters together
-			params.putAll(lResult.parameters);
+			params.putAll(lhs.parameters);
 		}
-		arrayAppend(parsed, lResult);
+		arrayAppend(parsed, lhs);
 
 		// recursively call method passing RHS object
-		var rResult = parseODataFilter(arguments.filter.getRHS(), arguments.allowed);
+		var rhs = parseODataFilter(arguments.filter.getRHS(), arguments.allowed);
 
-		if (structKeyExists(rResult, "allowed")) {
+		if (structKeyExists(rhs, "allowed")) {
 			arrayAppend(parsed, {
-				"method": "handleAndOrOperators",
-				"allowed": rResult.allowed,
-				"sql": variables.operatorsMap[operator]
+				"ODataType": ODataType,
+				"allowed": rhs.allowed,
+				"SQL": variables.ODataTypeMap[ODataType]
 			});
-			if (rResult.allowed) {
+			if (rhs.allowed) {
 				// merge parameters together
-				params.putAll(rResult.parameters);
-				structDelete(rResult, "parameters");
+				params.putAll(rhs.parameters);
+				structDelete(rhs, "parameters");
 			}
 		}
-		else if (structKeyExists(rResult, "parsed") && isArray(rResult.parsed)) {
+		else if (structKeyExists(rhs, "parsed") && isArray(rhs.parsed)) {
 			arrayAppend(parsed, {
-				"method": "handleAndOrOperators",
-				"allowed": rResult.parsed[1].allowed,
-				"sql": variables.operatorsMap[operator]
+				"ODataType": ODataType,
+				"allowed": rhs.parsed[1].allowed,
+				"SQL": variables.ODataTypeMap[ODataType]
 			});
 			// merge parameters together
-			params.putAll(rResult.parameters);
-			structDelete(rResult, "parameters");
+			params.putAll(rhs.parameters);
+			structDelete(rhs, "parameters");
 			// merge parsed together
-			parsed.addAll(rResult.parsed);
-			structDelete(rResult, "parsed");
+			parsed.addAll(rhs.parsed);
+			structDelete(rhs, "parsed");
 		}
 
-		if (structKeyExists(rResult, "method")) {
-			arrayAppend(parsed, rResult);
+		if (structKeyExists(rhs, "ODataType")) {
+			arrayAppend(parsed, rhs);
 		}
 
 		return {
@@ -286,19 +173,708 @@ component {
 		};
 	}
 
-	private string function wrapInParameterCount(required string parameterName) {
-		return arguments.parameterName & ++variables.parameterCount;
+	// BinaryCommonExpression
+	private function BinaryCommonExpression(required filter, required allowed) {
+		var ODataType = arguments.filter.getLHS().toString();
+
+		// error if there is no expression handler found
+		if (!structKeyExists(variables, ODataType)) {
+			_unhandled("Could not convert expression to SQL.", "Type '" & ODataType & "' unaccounted for.");
+		}
+
+		var method = variables[ODataType];
+		return method(arguments.filter, arguments.allowed);
+	}
+
+	// BinaryLiteral (LiteralExpression)
+	private function BinaryLiteral(required filter, required allowed) {
+		return LiteralExpression(arguments.filter, arguments.allowed);
+	}
+
+	// BooleanLiteral (BoolCommonExpression, LiteralExpression)
+	private function BooleanLiteral(required filter, required allowed) {
+		return LiteralExpression(arguments.filter, arguments.allowed);
+	}
+
+	// BoolMethodExpression (BoolCommonExpression, MethodCallExpression)
+	private function BoolMethodExpression(required filter, required allowed) {
+		var ODataType = arguments.filter.toString();
+		var sql = createObject("java", "java.lang.StringBuilder").init();
+
+		var lhs = CommonExpression(arguments.filter.getTarget(), arguments.allowed);
+		var rhs = CommonExpression(arguments.filter.getValue(), arguments.allowed);
+		var parameters = _getParameters(lhs, rhs);
+
+		sql.append(_getSQL(lhs) & " " & variables.ODataTypeMap[ODataType] & " " & _getSQL(rhs));
+
+		// add % to parameter value for LIKE only
+		for (var parameter in parameters) {
+			if (ODataType == "EndsWithMethodCallExpression")			parameters[parameter] = "%" & parameters[parameter];
+			else if (ODataType == "StartsWithMethodCallExpression")		parameters[parameter] = parameters[parameter] & "%";
+			else if (ODataType == "SubstringOfMethodCallExpression")	parameters[parameter] = "%" & parameters[parameter] & "%";
+		}
+
+		return {
+			"ODataType": ODataType,
+			"LHS": lhs,
+			"RHS": rhs,
+			"SQLValue": variables.ODataTypeMap[ODataType],
+			"SQL": sql.toString(),
+			"parameters": parameters,
+			"allowed": _isParameterAllowed(arguments.allowed, lhs, rhs)
+		};
+	}
+
+	// BoolParenExpression (BoolCommonExpression)
+	private function BoolParenExpression(required filter, required allowed) {
+		var ODataType = arguments.filter.toString();
+		var result = parseODataFilter(arguments.filter.getExpression(), arguments.allowed);
+		arrayPrepend(result["parsed"], {
+			"allowed": true,
+			"ODataType": ODataType,
+			"SQLValue": "(",
+			"SQL": "("
+		});
+		arrayAppend(result["parsed"], {
+			"allowed": true,
+			"ODataType": ODataType,
+			"SQLValue": ")",
+			"SQL": ")"
+		});
+
+		return result;
+	}
+
+	// ByteLiteral (LiteralExpression)
+	private function ByteLiteral(required filter, required allowed) {
+		return LiteralExpression(arguments.filter, arguments.allowed);
+	}
+
+	// TODO: CastExpression
+
+	// CeilingMethodCallExpression (MethodCallExpression)
+	private function CeilingMethodCallExpression(required filter, required allowed) {
+		return MethodCallExpression(arguments.filter, arguments.allowed);
+	}
+
+	private array function CommonExpression(required filter, required allowed) {
+		// NOTE: there is a bug with TRIM.toString() where it returns LENGTH class name instead
+		//var ODataType = arguments.filter.toString();
+		var ODataType = replace(listLast(arguments.filter.getClass().getName(), "$"), "Impl", "");
+		var result = [];
+
+		// TODO: look to grab super class and use it to make the below much simpler/cleaner
+
+		if (ODataType == "BooleanLiteral") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"ODataValue": arguments.filter.getValue(),
+				"SQLType": "boolean",
+				"SQLParameter": getBindingParameter(),
+				"SQLValue": arguments.filter.getValue()
+			});
+		}
+		else if (ODataType == "CeilingMethodCallExpression") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"SQLFunction": variables.ODataTypeMap[ODataType],
+				"SQLArguments": [
+					CommonExpression(arguments.filter.getTarget(), arguments.allowed)[1]
+				]
+			});
+		}
+		else if (ODataType == "ConcatMethodCallExpression") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"SQLFunction": variables.ODataTypeMap[ODataType],
+				"SQLArguments": [
+					CommonExpression(arguments.filter.getLHS(), arguments.allowed)[1],
+					CommonExpression(arguments.filter.getRHS(), arguments.allowed)[1]
+				]
+			});
+		}
+		else if (ODataType == "DayMethodCallExpression") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"SQLFunction": variables.ODataTypeMap[ODataType],
+				"SQLArguments": [
+					CommonExpression(arguments.filter.getTarget(), arguments.allowed)[1]
+				]
+			});
+		}
+
+		else if (ODataType == "StringLiteral") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"ODataValue": arguments.filter.getValue(),
+				"SQLType": "string",
+				"SQLParameter": getBindingParameter(),
+				"SQLValue": arguments.filter.getValue()
+			});
+		}
+		else if (ODataType == "IntegralLiteral") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"ODataValue": arguments.filter.getValue(),
+				"SQLType": "integer",
+				"SQLParameter": getBindingParameter(),
+				"SQLValue": arguments.filter.getValue()
+			});
+		}
+		else if (ODataType == "NullLiteral") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"ODataValue": "NULL",
+				"SQLType": javaCast("null", ""),
+				"SQLParameter": getBindingParameter(),
+				"SQLValue": javaCast("null", "")
+			});
+		}
+		else if (ODataType == "EntitySimpleProperty") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"ODataValue": arguments.filter.getPropertyName(),
+				"SQLType": "columnName",
+				"SQLParameter": javaCast("null", ""),
+				"SQLValue": arguments.filter.getPropertyName()
+			});
+		}
+		else if (ODataType == "LengthMethodCallExpression") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"SQLFunction": variables.ODataTypeMap[ODataType],
+				"SQLArguments": [
+					CommonExpression(arguments.filter.getTarget(), arguments.allowed)[1]
+				]
+			});
+		}
+		else if (ODataType == "IndexOfMethodCallExpression") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"SQLFunction": variables.ODataTypeMap[ODataType],
+				"SQLArguments": [
+					CommonExpression(arguments.filter.getValue(), arguments.allowed)[1],
+					CommonExpression(arguments.filter.getTarget(), arguments.allowed)[1]
+				]
+			});
+		}
+		else if (ODataType == "ReplaceMethodCallExpression") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"SQLFunction": variables.ODataTypeMap[ODataType],
+				"SQLArguments": [
+					CommonExpression(arguments.filter.getTarget(), arguments.allowed)[1],
+					CommonExpression(arguments.filter.getFind(), arguments.allowed)[1],
+					CommonExpression(arguments.filter.getReplace(), arguments.allowed)[1]
+				]
+			});
+		}
+		else if (ODataType == "SubstringMethodCallExpression") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"SQLFunction": variables.ODataTypeMap[ODataType],
+				"SQLArguments": [
+					CommonExpression(arguments.filter.getTarget(), arguments.allowed)[1],
+					CommonExpression(arguments.filter.getStart(), arguments.allowed)[1],
+					isNull(arguments.filter.getLength()) ? javaCast("null", "") : CommonExpression(arguments.filter.getLength(), arguments.allowed)[1]
+				]
+			});
+		}
+		else if (ODataType == "ToLowerMethodCallExpression") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"SQLFunction": variables.ODataTypeMap[ODataType],
+				"SQLArguments": [
+					CommonExpression(arguments.filter.getTarget(), arguments.allowed)[1]
+				]
+			});
+		}
+		else if (ODataType == "ToUpperMethodCallExpression") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"SQLFunction": variables.ODataTypeMap[ODataType],
+				"SQLArguments": [
+					CommonExpression(arguments.filter.getTarget(), arguments.allowed)[1]
+				]
+			});
+		}
+		else if (ODataType == "TrimMethodCallExpression") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"SQLFunction": variables.ODataTypeMap[ODataType],
+				"SQLArguments": [
+					CommonExpression(arguments.filter.getTarget(), arguments.allowed)[1]
+				]
+			});
+		}
+		else if (ODataType == "MonthMethodCallExpression") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"SQLFunction": variables.ODataTypeMap[ODataType],
+				"SQLArguments": [
+					CommonExpression(arguments.filter.getTarget(), arguments.allowed)[1]
+				]
+			});
+		}
+		else if (ODataType == "YearMethodCallExpression") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"SQLFunction": variables.ODataTypeMap[ODataType],
+				"SQLArguments": [
+					CommonExpression(arguments.filter.getTarget(), arguments.allowed)[1]
+				]
+			});
+		}
+		else if (ODataType == "HourMethodCallExpression") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"SQLFunction": variables.ODataTypeMap[ODataType],
+				"SQLArguments": [
+					CommonExpression(arguments.filter.getTarget(), arguments.allowed)[1]
+				]
+			});
+		}
+		else if (ODataType == "MinuteMethodCallExpression") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"SQLFunction": variables.ODataTypeMap[ODataType],
+				"SQLArguments": [
+					CommonExpression(arguments.filter.getTarget(), arguments.allowed)[1]
+				]
+			});
+		}
+		else if (ODataType == "SecondMethodCallExpression") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"SQLFunction": variables.ODataTypeMap[ODataType],
+				"SQLArguments": [
+					CommonExpression(arguments.filter.getTarget(), arguments.allowed)[1]
+				]
+			});
+		}
+		else if (ODataType == "RoundMethodCallExpression") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"SQLFunction": variables.ODataTypeMap[ODataType],
+				"SQLArguments": [
+					CommonExpression(arguments.filter.getTarget(), arguments.allowed)[1]
+				]
+			});
+		}
+		else if (ODataType == "FloorMethodCallExpression") {
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"SQLFunction": variables.ODataTypeMap[ODataType],
+				"SQLArguments": [
+					CommonExpression(arguments.filter.getTarget(), arguments.allowed)[1]
+				]
+			});
+		}
+		else {
+			_unhandled("Could not convert expression to SQL.", "Type '" & ODataType & "' unaccounted for.");
+		}
+
+		return result;
+	}
+
+	// ConcatMethodCallExpression (MethodCallExpression)
+	private function ConcatMethodCallExpression(required filter, required allowed) {
+		return MethodCallExpression(arguments.filter, arguments.allowed);
+	}
+
+	// DateTimeLiteral (LiteralExpression)
+	private function DateTimeLiteral(required filter, required allowed) {
+		return LiteralExpression(arguments.filter, arguments.allowed);
+	}
+
+	// DateTimeOffsetLiteral (LiteralExpression)
+	private function DateTimeOffsetLiteral(required filter, required allowed) {
+		return LiteralExpression(arguments.filter, arguments.allowed);
+	}
+
+	// DayMethodCallExpression (MethodCallExpression)
+	private function DayMethodCallExpression(required filter, required allowed) {
+		return MethodCallExpression(arguments.filter, arguments.allowed);
+	}
+
+	// DecimalLiteral (LiteralExpression)
+	private function DecimalLiteral(required filter, required allowed) {
+		return LiteralExpression(arguments.filter, arguments.allowed);
+	}
+
+	// DivExpression (BinaryCommonExpression)
+	private function DivExpression(required filter, required allowed) {
+		return BinaryCommonExpression(arguments.filter, arguments.allowed);
+	}
+
+	// DoubleLiteral (LiteralExpression)
+	private function DoubleLiteral(required filter, required allowed) {
+		return LiteralExpression(arguments.filter, arguments.allowed);
+	}
+
+	// EndsWithMethodCallExpression (BoolCommonExpression, BoolMethodExpression, MethodCallExpression)
+	private function EndsWithMethodCallExpression(required filter, required allowed) {
+		return BoolMethodExpression(arguments.filter, arguments.allowed);
+	}
+
+	// EntitySimpleProperty
+	private function EntitySimpleProperty(required filter, required allowed) {
+		var ODataType = arguments.filter.toString();
+		var sql = createObject("java", "java.lang.StringBuilder").init();
+
+		var lhs = CommonExpression(arguments.filter.getLHS(), arguments.allowed);
+		var rhs = CommonExpression(arguments.filter.getRHS(), arguments.allowed);
+		var parameters = _getParameters(lhs, rhs);
+
+		sql.append(_getSQL(lhs) & " " & variables.ODataTypeMap[ODataType] & " " & _getSQL(rhs));
+
+		return {
+			"ODataType": ODataType,
+			"LHS": lhs,
+			"RHS": rhs,
+			"SQLValue": variables.ODataTypeMap[ODataType],
+			"SQL": sql.toString(),
+			"parameters": parameters,
+			"allowed": _isParameterAllowed(arguments.allowed, lhs, rhs)
+		};
+	}
+
+	// EqExpression (BinaryCommonExpression, BoolCommonExpression)
+	private function EqExpression(required filter, required allowed) {
+		return BinaryCommonExpression(arguments.filter, arguments.allowed);
+	}
+
+	// FloorMethodCallExpression (MethodCallExpression)
+	private function FloorMethodCallExpression(required filter, required allowed) {
+		return MethodCallExpression(arguments.filter, arguments.allowed);
+	}
+
+	// GeExpression (BinaryCommonExpression, BoolCommonExpression)
+	private function GeExpression(required filter, required allowed) {
+		return BinaryCommonExpression(arguments.filter, arguments.allowed);
+	}
+
+	// GtExpression (BinaryCommonExpression, BoolCommonExpression)
+	private function GtExpression(required filter, required allowed) {
+		return BinaryCommonExpression(arguments.filter, arguments.allowed);
+	}
+
+	// GuidLiteral (LiteralExpression)
+	private function GuidLiteral(required filter, required allowed) {
+		return LiteralExpression(arguments.filter, arguments.allowed);
+	}
+
+	// HourMethodCallExpression (MethodCallExpression)
+	private function HourMethodCallExpression(required filter, required allowed) {
+		return MethodCallExpression(arguments.filter, arguments.allowed);
+	}
+
+	// IndexOfMethodCallExpression (MethodCallExpression)
+	private function IndexOfMethodCallExpression(required filter, required allowed) {
+		return MethodCallExpression(arguments.filter, arguments.allowed);
+	}
+
+	// Int64Literal (LiteralExpression)
+	private function Int64Literal(required filter, required allowed) {
+		return LiteralExpression(arguments.filter, arguments.allowed);
+	}
+
+	// IntegralLiteral (LiteralExpression)
+	private function IntegralLiteral(required filter, required allowed) {
+		return LiteralExpression(arguments.filter, arguments.allowed);
+	}
+
+	// TODO: IsofExpression (BoolCommonExpression)
+
+	// LeExpression (BinaryCommonExpression, BoolCommonExpression)
+	private function LeExpression(required filter, required allowed) {
+		return BinaryCommonExpression(arguments.filter, arguments.allowed);
+	}
+
+	// LengthMethodCallExpression (MethodCallExpression)
+	private function LengthMethodCallExpression(required filter, required allowed) {
+		return MethodCallExpression(arguments.filter, arguments.allowed);
+	}
+
+	// LiteralExpression
+	private function LiteralExpression(required filter, required allowed) {
+		var ODataType = arguments.filter.toString();
+		var sql = createObject("java", "java.lang.StringBuilder").init();
+
+		var lhs = CommonExpression(arguments.filter.getLHS(), arguments.allowed);
+		var rhs = CommonExpression(arguments.filter.getRHS(), arguments.allowed);
+		var parameters = _getParameters(lhs, rhs);
+
+		sql.append(_getSQL(lhs) & " " & variables.ODataTypeMap[ODataType] & " " & _getSQL(rhs));
+
+		return {
+			"ODataType": ODataType,
+			"LHS": lhs,
+			"RHS": rhs,
+			"SQLValue": variables.ODataTypeMap[ODataType],
+			"SQL": sql.toString(),
+			"parameters": parameters,
+			"allowed": _isParameterAllowed(arguments.allowed, lhs, rhs)
+		};
+	}
+
+	// LtExpression (BinaryCommonExpression, BoolCommonExpression)
+	private function LtExpression(required filter, required allowed) {
+		return BinaryCommonExpression(arguments.filter, arguments.allowed);
+	}
+
+	// MethodCallExpression
+	private function MethodCallExpression(required filter, required allowed) {
+		var ODataType = arguments.filter.toString();
+		var sql = createObject("java", "java.lang.StringBuilder").init();
+
+		var lhs = CommonExpression(arguments.filter.getLHS(), arguments.allowed);
+		var rhs = CommonExpression(arguments.filter.getRHS(), arguments.allowed);
+		var parameters = _getParameters(lhs, rhs);
+
+		sql.append(_getSQL(lhs) & " " & variables.ODataTypeMap[ODataType] & " " & _getSQL(rhs));
+
+		return {
+			"ODataType": ODataType,
+			"LHS": lhs,
+			"RHS": rhs,
+			"SQLValue": variables.ODataTypeMap[ODataType],
+			"SQL": sql.toString(),
+			"parameters": parameters,
+			"allowed": _isParameterAllowed(arguments.allowed, lhs, rhs)
+		};
+	}
+
+	// MinuteMethodCallExpression (MethodCallExpression)
+	private function MinuteMethodCallExpression(required filter, required allowed) {
+		return MethodCallExpression(arguments.filter, arguments.allowed);
+	}
+
+	// ModExpression (BinaryCommonExpression)
+	private function ModExpression(required filter, required allowed) {
+		return BinaryCommonExpression(arguments.filter, arguments.allowed);
+	}
+
+	// MonthMethodCallExpression (MethodCallExpression)
+	private function MonthMethodCallExpression(required filter, required allowed) {
+		return MethodCallExpression(arguments.filter, arguments.allowed);
+	}
+
+	// MulExpression (BinaryCommonExpression)
+	private function MulExpression(required filter, required allowed) {
+		return BinaryCommonExpression(arguments.filter, arguments.allowed);
+	}
+
+	// NeExpression (BinaryCommonExpression, BoolCommonExpression)
+	private function NeExpression(required filter, required allowed) {
+		return BinaryCommonExpression(arguments.filter, arguments.allowed);
+	}
+
+	// TODO: NegateExpression (BoolCommonExpression)
+	// TODO: NotExpression (BoolCommonExpression)
+
+	// NullLiteral (LiteralExpression)
+	private function NullLiteral(required filter, required allowed) {
+		return LiteralExpression(arguments.filter, arguments.allowed);
+	}
+
+	// OrExpression (BinaryBoolCommonExpression, BoolCommonExpression)
+	private function OrExpression(required filter, required allowed) {
+		return BinaryBoolCommonExpression(arguments.filter, arguments.allowed);
+	}
+
+	// TODO: ParenExpression
+
+	// ReplaceMethodCallExpression (MethodCallExpression)
+	private function ReplaceMethodCallExpression(required filter, required allowed) {
+		return MethodCallExpression(arguments.filter, arguments.allowed);
+	}
+
+	// RoundMethodCallExpression (MethodCallExpression)
+	private function RoundMethodCallExpression(required filter, required allowed) {
+		return MethodCallExpression(arguments.filter, arguments.allowed);
+	}
+
+	// SByteLiteral (LiteralExpression)
+	private function SByteLiteral(required filter, required allowed) {
+		return LiteralExpression(arguments.filter, arguments.allowed);
+	}
+
+	// SecondMethodCallExpression (MethodCallExpression)
+	private function SecondMethodCallExpression(required filter, required allowed) {
+		return MethodCallExpression(arguments.filter, arguments.allowed);
+	}
+
+	// SingleLiteral (LiteralExpression)
+	private function SingleLiteral(required filter, required allowed) {
+		return LiteralExpression(arguments.filter, arguments.allowed);
+	}
+
+	// StartsWithMethodCallExpression (BoolCommonExpression, BoolMethodExpression, MethodCallExpression)
+	private function StartsWithMethodCallExpression(required filter, required allowed) {
+		return BoolMethodExpression(arguments.filter, arguments.allowed);
+	}
+
+	// StringLiteral (LiteralExpression)
+	private function StringLiteral(required filter, required allowed) {
+		return LiteralExpression(arguments.filter, arguments.allowed);
+	}
+
+	// SubExpression (BinaryCommonExpression)
+	private function SubExpression(required filter, required allowed) {
+		return BinaryCommonExpression(arguments.filter, arguments.allowed);
+	}
+
+	// SubstringMethodCallExpression (MethodCallExpression)
+	private function SubstringMethodCallExpression(required filter, required allowed) {
+		return MethodCallExpression(arguments.filter, arguments.allowed);
+	}
+
+	// SubstringOfMethodCallExpression (BoolCommonExpression, BoolMethodExpression, MethodCallExpression)
+	private function SubstringOfMethodCallExpression(required filter, required allowed) {
+		return BoolMethodExpression(arguments.filter, arguments.allowed);
+	}
+
+	// TimeLiteral (LiteralExpression)
+	private function TimeLiteral(required filter, required allowed) {
+		return LiteralExpression(arguments.filter, arguments.allowed);
+	}
+
+	// ToLowerMethodCallExpression (MethodCallExpression)
+	private function ToLowerMethodCallExpression(required filter, required allowed) {
+		return MethodCallExpression(arguments.filter, arguments.allowed);
+	}
+
+	// ToUpperMethodCallExpression (MethodCallExpression)
+	private function ToUpperMethodCallExpression(required filter, required allowed) {
+		return MethodCallExpression(arguments.filter, arguments.allowed);
+	}
+
+	// TrimMethodCallExpression (MethodCallExpression)
+	private function TrimMethodCallExpression(required filter, required allowed) {
+		return MethodCallExpression(arguments.filter, arguments.allowed);
+	}
+
+	// YearMethodCallExpression (MethodCallExpression)
+	private function YearMethodCallExpression(required filter, required allowed) {
+		return MethodCallExpression(arguments.filter, arguments.allowed);
+	}
+
+	/* END: Expression handlers */
+
+	/* miscellaneous private methods */
+
+	private void function _unhandled(required string message, required string detail) {
+		// how should we handle this?  log it? throw an error/abort?
+		throw(type="org.odata.errors.UnhandledExpression", message=arguments.message, detail=arguments.detail);
+		abort;
+	}
+
+	private function _getParameters(required lhs, required rhs) {
+		var result = _getParameter(arguments.lhs);
+		result.putAll(_getParameter(arguments.rhs));
+		return result;
+	}
+
+	private function _getParameter(required property) {
+		var result = {};
+
+		if (isArray(arguments.property)) {
+			for (var prop in arguments.property) {
+				if (isNull(prop)) continue;
+				var nestedResult = _getParameter(prop);
+				if (!isNull(nestedResult)) result.putAll(nestedResult);
+			}
+			return result;
+		}
+
+		// grab parameters from SQLArguments
+		if (structKeyExists(arguments.property, "SQLFunction")) {
+			var nestedResult = _getParameter(arguments.property.SQLArguments);
+			if (!isNull(nestedResult)) result.putAll(nestedResult);
+			return result;
+		}
+
+		// skip if no parameter required
+		if (!structKeyExists(arguments.property, "SQLParameter")) {
+			return;
+		}
+
+		// return parameter/value
+		result[arguments.property.SQLParameter] = structKeyExists(arguments.property, "SQLValue") ? arguments.property.SQLValue : javaCast("null", "");
+		return result;
+	}
+
+	private string function _getSQL(required property) {
+		var result = createObject("java", "java.lang.StringBuilder").init();
+
+		if (isArray(arguments.property)) {
+			var arrLen = arrayLen(arguments.property);
+			for (var i=1; i<=arrLen; i++) {
+				if (isNull(arguments.property[i])) continue;
+				if (i>1) result.append(" , ");
+				result.append(_getSQL(arguments.property[i]));
+			}
+			return result.toString();
+		}
+
+		// return SQL function
+		if (structKeyExists(arguments.property, "SQLFunction")) {
+			// MSSQL does not support TRIM() so use LTRIM(RTRIM()) instead
+			if (arguments.property.SQLFunction == "TRIM") {
+				result.append("LTRIM(RTRIM( ");
+				result.append(_getSQL(arguments.property.SQLArguments));
+				result.append(" ))");
+			}
+			else {
+				result.append(arguments.property.SQLFunction);
+				result.append("( ");
+				result.append(_getSQL(arguments.property.SQLArguments));
+				result.append(" )");
+			}
+			return result.toString();
+		}
+
+		// return value as-is
+		if (!structKeyExists(arguments.property, "SQLParameter")) {
+			result.append(arguments.property.SQLValue);
+			return result.toString();
+		}
+
+		// return parameter binding
+		result.append(":" & arguments.property.SQLParameter);
+		return result.toString();
+	}
+
+	private boolean function _isParameterAllowed(required allowed, required lhs, required rhs) {
+		if (!isArray(arguments.allowed)) return true;
+
+		// we need to search both lhs and rhs for ALL columnNames
+		var cols = arrayFilter(arguments.lhs, function(elm) {
+			if (elm.SQLType == "columnName") return true;
+			return false;
+		});
+		cols.addAll(arrayFilter(arguments.rhs, function(elm) {
+			if (elm.SQLType == "columnName") return true;
+			return false;
+		}));
+
+		// if any columnNames are not allowed the entire statement is not allowed
+		var arrAllowed = arguments.allowed;
+		var index = arrayFind(cols, function(elm) {
+			if (arrayFindNoCase(arrAllowed, elm.SQLValue)) return true;
+			return false;
+		});
+
+		return index > 0 ? true : false;
+	}
+
+	private string function getBindingParameter() {
+		return "parameter" & ++variables.parameterCount;
 	}
 
 	private void function resetParameterCount() {
 		variables.parameterCount = 0;
-	}
-
-	private boolean function isParameterAllowed(required array allowed, required string parameterName) {
-		if (arrayFind(arguments.allowed, arguments.parameterName)) {
-			return true;
-		}
-		return false;
 	}
 
 }
