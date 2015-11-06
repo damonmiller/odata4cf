@@ -325,9 +325,9 @@ component {
 			arrayAppend(result, {
 				"ODataType": ODataType,
 				"ODataValue": "NULL",
-				"SQLType": javaCast("null", ""),
-				"SQLParameter": getBindingParameter(),
-				"SQLValue": javaCast("null", "")
+				"SQLType": "NULL",
+				"SQLParameter": javaCast("null", ""),
+				"SQLValue": "NULL"
 			});
 		}
 		else if (ODataType == "EntitySimpleProperty") {
@@ -851,11 +851,11 @@ component {
 
 		// we need to search both lhs and rhs for ALL columnNames
 		var cols = arrayFilter(arguments.lhs, function(elm) {
-			if (elm.SQLType == "columnName") return true;
+			if (structKeyExists(elm, "SQLType") && elm.SQLType == "columnName") return true;
 			return false;
 		});
 		cols.addAll(arrayFilter(arguments.rhs, function(elm) {
-			if (elm.SQLType == "columnName") return true;
+			if (structKeyExists(elm, "SQLType") && elm.SQLType == "columnName") return true;
 			return false;
 		}));
 

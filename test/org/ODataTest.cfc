@@ -206,21 +206,19 @@ component extends="testbox.system.BaseSpec" {
 	public void function testParseFilter_null() {
 		var OData = new org.OData();
 
-		var result = OData.parseFilter("Entry_No eq null");
-		$assert.isEqual("EntitySimpleProperty", result.lhs[1].ODataType);
-		$assert.isEqual("NullLiteral", result.rhs[1].ODataType);
-		$assert.isEqual("Entry_No = :parameter1", result.sql);
+		var result = OData.parseFilter("Entry_No eq null or Entry_No eq 0");
+		$assert.isEqual("EntitySimpleProperty", result.parsed[1].lhs[1].ODataType);
+		$assert.isEqual("NullLiteral", result.parsed[1].rhs[1].ODataType);
+		$assert.isEqual("Entry_No = NULL OR Entry_No = :parameter1", result.sql);
 		$assert.isEqual(1, structCount(result.parameters));
-		$assert.isTrue(structKeyList(result.parameters) == "parameter1");
-		$assert.isFalse(structKeyExists(result.parameters, "parameter1"));
+		$assert.isEqual(0, result.parameters["parameter1"]);
 
-		var result = OData.parseFilter("null eq Entry_No");
-		$assert.isEqual("NullLiteral", result.lhs[1].ODataType);
-		$assert.isEqual("EntitySimpleProperty", result.rhs[1].ODataType);
-		$assert.isEqual(":parameter1 = Entry_No", result.sql);
+		var result = OData.parseFilter("null eq Entry_No or 0 eq Entry_No");
+		$assert.isEqual("NullLiteral", result.parsed[1].lhs[1].ODataType);
+		$assert.isEqual("EntitySimpleProperty", result.parsed[1].rhs[1].ODataType);
+		$assert.isEqual("NULL = Entry_No OR :parameter1 = Entry_No", result.sql);
 		$assert.isEqual(1, structCount(result.parameters));
-		$assert.isTrue(structKeyList(result.parameters) == "parameter1");
-		$assert.isFalse(structKeyExists(result.parameters, "parameter1"));
+		$assert.isEqual(0, result.parameters["parameter1"]);
 	}
 
 	public void function testParseFilter_and() {
