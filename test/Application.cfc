@@ -1,5 +1,5 @@
 ﻿/*
-	OData for ColdFusion and Railo Applications
+	OData for ColdFusion and Lucee Applications
 
 	The MIT License (MIT)
 
