@@ -150,6 +150,23 @@ component extends="testbox.system.BaseSpec" {
 		$assert.isTrue(structKeyExists(result, "sql"));
 		$assert.isTrue(isSimpleValue(result.sql));
 		$assert.isEqual("a <> b and ( lhs = :parameter1 or :parameter2 = rhs )", result.sql);
+
+		// reverse it!
+		var result = OData.parseFilter("(lhs eq 'rhs' or 'lhs' eq rhs) and a ne b");
+		$assert.isTrue(isStruct(result));
+
+		// verify parameters
+		$assert.isTrue(structKeyExists(result, "parameters"));
+		$assert.isEqual(2, structCount(result.parameters));
+		$assert.isTrue(structKeyExists(result.parameters, "parameter1"));
+		$assert.isEqual("rhs", result.parameters["parameter1"]);
+		$assert.isTrue(structKeyExists(result.parameters, "parameter2"));
+		$assert.isEqual("lhs", result.parameters["parameter2"]);
+
+		// verify sql
+		$assert.isTrue(structKeyExists(result, "sql"));
+		$assert.isTrue(isSimpleValue(result.sql));
+		$assert.isEqual("( lhs = :parameter1 or :parameter2 = rhs ) and a <> b", result.sql);
 	}
 
 	public void function testParseFilter_allowed() {

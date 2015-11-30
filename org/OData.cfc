@@ -132,6 +132,14 @@ component {
 				params.putAll(lhs.parameters);
 			}
 		}
+		else if (structKeyExists(lhs, "parsed") && !isNull(lhs.parsed) && isArray(lhs.parsed)) {
+			// merge parameters together
+			params.putAll(lhs.parameters);
+			structDelete(lhs, "parameters");
+			// merge parsed together
+			parsed.addAll(lhs.parsed);
+			structDelete(lhs, "parsed");
+		}
 
 		arrayAppend(parsed, lhs);
 
