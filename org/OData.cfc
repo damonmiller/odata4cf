@@ -73,28 +73,26 @@ component {
 		var ODataType = arguments.filter.toString();
 
 		// error if there is no expression handler found
-		if (!structKeyExists(variables, ODataType)) {
+		if (!(structKeyExists(variables, ODataType) && !isNull(variables[ODataType]))) {
 			_unhandled("Could not convert expression to SQL.", "Type '" & ODataType & "' unaccounted for.");
 		}
 
 		var method = variables[ODataType];
 		var results = method(arguments.filter, arguments.allowed);
 
-		if (structKeyExists(results, "allowed") && !results.allowed) {
+		if (structKeyExists(results, "allowed") && !isNull(results.allowed) && !results.allowed) {
 			results["SQL"] = "";
 			results["parameters"] = {};
 		}
-		else if (structKeyExists(results, "parsed")) {
+		else if (structKeyExists(results, "parsed") && !isNull(results.parsed)) {
 			var sb = createObject("java", "java.lang.StringBuilder").init();
-			var hasSQL = false;
 			arrayEach(results.parsed, function(result, i) {
-				if (structKeyExists(result, "allowed") && result.allowed) {
+				if (structKeyExists(result, "allowed") && !isNull(result.allowed) && result.allowed) {
 					// if we hit and/or as first SQL to include, we need to skip it
-					if (!hasSQL && listFind("AndExpression,OrExpression", result["ODataType"])) {
+					if (sb.length() == 0 && listFind("AndExpression,OrExpression", result["ODataType"])) {
 						continue;
 					}
 					sb.append(" " & result["SQL"]);
-					hasSQL = true;
 				}
 			});
 			results["SQL"] = trim(sb.toString());
@@ -126,18 +124,20 @@ component {
 
 		// recursively call method passing LHS object
 		var lhs = parseODataFilter(arguments.filter.getLHS(), arguments.allowed);
-		if (lhs.allowed) {
-			// add returned SQL to our SQL
-			sql.append(lhs.sql);
-			// merge parameters together
-			params.putAll(lhs.parameters);
+		if (structKeyExists(lhs, "allowed") && !isNull(lhs.allowed)) {
+			if (lhs.allowed) {
+				// add returned SQL to our SQL
+				sql.append(lhs.sql);
+				// merge parameters together
+				params.putAll(lhs.parameters);
+			}
 		}
+
 		arrayAppend(parsed, lhs);
 
 		// recursively call method passing RHS object
 		var rhs = parseODataFilter(arguments.filter.getRHS(), arguments.allowed);
-
-		if (structKeyExists(rhs, "allowed")) {
+		if (structKeyExists(rhs, "allowed") && !isNull(rhs.allowed)) {
 			arrayAppend(parsed, {
 				"ODataType": ODataType,
 				"allowed": rhs.allowed,
@@ -149,7 +149,7 @@ component {
 				structDelete(rhs, "parameters");
 			}
 		}
-		else if (structKeyExists(rhs, "parsed") && isArray(rhs.parsed)) {
+		else if (structKeyExists(rhs, "parsed") && !isNull(rhs.parsed) && isArray(rhs.parsed)) {
 			arrayAppend(parsed, {
 				"ODataType": ODataType,
 				"allowed": rhs.parsed[1].allowed,
@@ -163,7 +163,7 @@ component {
 			structDelete(rhs, "parsed");
 		}
 
-		if (structKeyExists(rhs, "ODataType")) {
+		if (structKeyExists(rhs, "ODataType") && !isNull(rhs.ODataType)) {
 			arrayAppend(parsed, rhs);
 		}
 
@@ -178,7 +178,7 @@ component {
 		var ODataType = arguments.filter.getLHS().toString();
 
 		// error if there is no expression handler found
-		if (!structKeyExists(variables, ODataType)) {
+		if (!(structKeyExists(variables, ODataType) && !isNull(variables[ODataType]))) {
 			_unhandled("Could not convert expression to SQL.", "Type '" & ODataType & "' unaccounted for.");
 		}
 
@@ -789,19 +789,19 @@ component {
 		}
 
 		// grab parameters from SQLArguments
-		if (structKeyExists(arguments.property, "SQLFunction")) {
+		if (structKeyExists(arguments.property, "SQLFunction") && !isNull(arguments.property.SQLFunction)) {
 			var nestedResult = _getParameter(arguments.property.SQLArguments);
 			if (!isNull(nestedResult)) result.putAll(nestedResult);
 			return result;
 		}
 
 		// skip if no parameter required
-		if (!structKeyExists(arguments.property, "SQLParameter")) {
+		if (!(structKeyExists(arguments.property, "SQLParameter") && !isNull(arguments.property.SQLParameter))) {
 			return;
 		}
 
 		// return parameter/value
-		result[arguments.property.SQLParameter] = structKeyExists(arguments.property, "SQLValue") ? arguments.property.SQLValue : javaCast("null", "");
+		result[arguments.property.SQLParameter] = structKeyExists(arguments.property, "SQLValue") && !isNull(arguments.property.SQLValue) ? arguments.property.SQLValue : javaCast("null", "");
 		return result;
 	}
 
@@ -819,7 +819,7 @@ component {
 		}
 
 		// return SQL function
-		if (structKeyExists(arguments.property, "SQLFunction")) {
+		if (structKeyExists(arguments.property, "SQLFunction") && !isNull(arguments.property.SQLFunction)) {
 			// MSSQL does not support TRIM() so use LTRIM(RTRIM()) instead
 			if (arguments.property.SQLFunction == "TRIM") {
 				result.append("LTRIM(RTRIM( ");
@@ -836,7 +836,7 @@ component {
 		}
 
 		// return value as-is
-		if (!structKeyExists(arguments.property, "SQLParameter")) {
+		if (!(structKeyExists(arguments.property, "SQLParameter") && !isNull(arguments.property.SQLParameter))) {
 			result.append(arguments.property.SQLValue);
 			return result.toString();
 		}
@@ -851,11 +851,11 @@ component {
 
 		// we need to search both lhs and rhs for ALL columnNames
 		var cols = arrayFilter(arguments.lhs, function(elm) {
-			if (structKeyExists(elm, "SQLType") && elm.SQLType == "columnName") return true;
+			if (structKeyExists(elm, "SQLType") && !isNull(elm.SQLType) && elm.SQLType == "columnName") return true;
 			return false;
 		});
 		cols.addAll(arrayFilter(arguments.rhs, function(elm) {
-			if (structKeyExists(elm, "SQLType") && elm.SQLType == "columnName") return true;
+			if (structKeyExists(elm, "SQLType") && !isNull(elm.SQLType) && elm.SQLType == "columnName") return true;
 			return false;
 		}));
 
