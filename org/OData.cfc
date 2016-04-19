@@ -311,6 +311,28 @@ component {
 			});
 		}
 
+		else if (ODataType == "DateTimeLiteral") {
+			var dateValue = arguments.filter.getValue();
+			// Lucee uses newer version of Joda than CFServer which has the toDate() method.
+			// However, there is a TimeZone offset applied to the time when using toDate() which makes the time wrong.
+			// Use createDateTime() across the board for a consistent datetime.
+			//dateValue = dateValue.toDate();
+			dateValue = createDateTime(
+				dateValue.getYear(),
+				dateValue.getMonthOfYear(),
+				dateValue.getDayOfMonth(),
+				dateValue.getHourOfDay(),
+				dateValue.getMinuteOfHour(),
+				dateValue.getSecondOfMinute()
+			);
+			arrayAppend(result, {
+				"ODataType": ODataType,
+				"ODataValue": arguments.filter.getValue(),
+				"SQLType": "datetime",
+				"SQLParameter": getBindingParameter(),
+				"SQLValue": dateValue
+			});
+		}
 		else if (ODataType == "StringLiteral") {
 			arrayAppend(result, {
 				"ODataType": ODataType,

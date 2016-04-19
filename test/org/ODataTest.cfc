@@ -102,30 +102,50 @@ component extends="testbox.system.BaseSpec" {
 		//FAILS: result = OData.parseFilter("firstName Eq 'john'");
 	}
 
-	public void function testParseFilter_literals() {
+	public void function testParseFilter_literal_string() {
 		var OData = new org.OData();
 
 		var result = OData.parseFilter("col eq 'string'");
 		$assert.isEqual("EqExpression", result.ODataType);
 		$assert.isEqual("EntitySimpleProperty", result.lhs[1].ODataType);
 		$assert.isEqual("StringLiteral", result.rhs[1].ODataType);
+	}
+
+	public void function testParseFilter_literal_integer() {
+		var OData = new org.OData();
 
 		var result = OData.parseFilter("col eq 42");
 		$assert.isEqual("EqExpression", result.ODataType);
 		$assert.isEqual("EntitySimpleProperty", result.lhs[1].ODataType);
 		$assert.isEqual("IntegralLiteral", result.rhs[1].ODataType);
+	}
 
-		/* FAILS: Unable to read expression with tokens: [[3], [.], [14]]
+	/* FAILS: Unable to read expression with tokens: [[3], [.], [14]]
+	public void function testParseFilter_literal_decimal() {
+		var OData = new org.OData();
 
 		var result = OData.parseFilter("col eq 3.14");
 		$assert.isEqual("EqExpression", result.ODataType);
 		$assert.isEqual("EntitySimpleProperty", result.lhs[1].ODataType);
-		$assert.isEqual("DoubleLiteral", result.rhs[1].ODataType);*/
+		$assert.isEqual("DoubleLiteral", result.rhs[1].ODataType);
+	}*/
+
+	public void function testParseFilter_literal_boolean() {
+		var OData = new org.OData();
 
 		var result = OData.parseFilter("col eq true");
 		$assert.isEqual("EqExpression", result.ODataType);
 		$assert.isEqual("EntitySimpleProperty", result.lhs[1].ODataType);
 		$assert.isEqual("BooleanLiteral", result.rhs[1].ODataType);
+	}
+
+	public void function testParseFilter_literal_datetime() {
+		var OData = new org.OData();
+
+		var result = OData.parseFilter("col eq datetime'2010-01-25T02:13:40.1374695Z'");
+		$assert.isEqual("EqExpression", result.ODataType);
+		$assert.isEqual("EntitySimpleProperty", result.lhs[1].ODataType);
+		$assert.isEqual("DateTimeLiteral", result.rhs[1].ODataType);
 	}
 
 	public void function testParseFilter_parentheses() {
